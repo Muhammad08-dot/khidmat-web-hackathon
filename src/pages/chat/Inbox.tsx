@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { queryCollectionDocs } from '../services/firebase';
+import { useAuth } from '../../contexts/AuthContext';
+import { queryCollectionDocs } from '../../services/firebase';
 import { MessageSquare, ChevronRight, User, Calendar, MapPin } from 'lucide-react';
-import { Card, EmptyState } from '../components/ui/SharedUI';
+import { Card, EmptyState } from '../../components/ui';
 
 interface Booking {
   bookingId: string;

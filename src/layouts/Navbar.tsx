@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sun, Moon, Search, Mic, User as UserIcon, LogOut, ChevronDown, Calendar, MessageSquare } from 'lucide-react';
+import { Sun, Moon, Search, Mic, User as UserIcon, LogOut, ChevronDown, Calendar, MessageSquare, Repeat, Briefcase, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { writeDocument } from '../services/firebase';
-import { Avatar } from '../components/ui/SharedUI';
+import { Avatar } from '../components/ui';
 
 interface NavbarProps {
   onSearch?: (query: string) => void;
@@ -12,8 +12,9 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ onSearch, onVoiceTrigger }) => {
   const navigate = useNavigate();
-  const { user, userProfile, logout } = useAuth();
+  const { user, userProfile, logout, updateProfile } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [switchingRole, setSwitchingRole] = useState(false);
   
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('theme') === 'dark' || 
@@ -89,6 +90,32 @@ export const Navbar: React.FC<NavbarProps> = ({ onSearch, onVoiceTrigger }) => {
       console.error("Failed to toggle provider availability status:", err);
       // Rollback UI state on failure
       setIsAvailable(!newStatus);
+    }
+  };
+
+  const handleSwitchRole = async () => {
+    if (!userProfile) return;
+    setSwitchingRole(true);
+    const targetRole = userProfile.role === 'provider' ? 'customer' : 'provider';
+    
+    try {
+      const updates: any = { role: targetRole };
+      if (targetRole === 'provider' && !userProfile.category) {
+        updates.category = 'Handyman';
+        updates.tier = userProfile.tier || 'Silver';
+        updates.rating = userProfile.rating || 4.9;
+        updates.totalJobs = userProfile.totalJobs || 12;
+        updates.basePrice = userProfile.basePrice || 800;
+        updates.available = true;
+      }
+      
+      await updateProfile(updates);
+      setShowDropdown(false);
+      navigate('/');
+    } catch (err) {
+      console.error("Failed to switch role:", err);
+    } finally {
+      setSwitchingRole(false);
     }
   };
 
@@ -218,21 +245,50 @@ export const Navbar: React.FC<NavbarProps> = ({ onSearch, onVoiceTrigger }) => {
                     className="fixed inset-0 z-40" 
                     onClick={() => setShowDropdown(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-slate-800 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 text-left">
+                  <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white dark:bg-[#1E293B] border border-gray-200 dark:border-slate-800 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 text-left">
                     <div className="px-4 py-2 border-b border-gray-100 dark:border-slate-800">
                       <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-wider font-semibold">Account</p>
                       <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{userProfile.name}</p>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                          userProfile.role === 'provider'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-400'
+                            : 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-400'
+                        }`}>
+                          {userProfile.role === 'provider' ? '🛠️ Provider View' : '🛒 Customer View'}
+                        </span>
+                      </div>
                     </div>
+
+                    {/* Role Switcher Action */}
+                    <div className="p-2 border-b border-gray-100 dark:border-slate-800">
+                      <button
+                        onClick={handleSwitchRole}
+                        disabled={switchingRole}
+                        className="w-full px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 flex items-center justify-between transition-colors border border-emerald-200/50 dark:border-emerald-800/40 cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Repeat className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span>{switchingRole ? 'Switching...' : `Switch to ${userProfile.role === 'provider' ? 'Customer' : 'Provider'}`}</span>
+                        </span>
+                        {userProfile.role === 'provider' ? (
+                          <ShoppingBag className="w-3.5 h-3.5 opacity-70" />
+                        ) : (
+                          <Briefcase className="w-3.5 h-3.5 opacity-70" />
+                        )}
+                      </button>
+                    </div>
+
                     <button
                       onClick={handleViewProfileClick}
-                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800/50 flex items-center gap-2 transition-colors"
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800/50 flex items-center gap-2 transition-colors cursor-pointer"
                     >
                       <UserIcon className="w-4 h-4 text-gray-400" />
                       View Profile
                     </button>
                     <button
                       onClick={handleLogoutClick}
-                      className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 flex items-center gap-2 transition-colors border-t border-gray-100 dark:border-slate-800"
+                      className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 flex items-center gap-2 transition-colors border-t border-gray-100 dark:border-slate-800 cursor-pointer"
                     >
                       <LogOut className="w-4 h-4 text-red-600 dark:text-red-400" />
                       Logout

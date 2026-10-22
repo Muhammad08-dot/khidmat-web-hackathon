@@ -1,7 +1,16 @@
+import { getDistanceKm, type LocationCoords } from '../utils/location';
+import type { PriceEstimateResult } from '../types';
+export type { PriceEstimateResult };
+
 export interface ParsedIntent {
   category: string;
   urgency: 'low' | 'medium' | 'high';
   summary: string;
+}
+
+export interface RankedProviderResult {
+  userId: string;
+  reason: string;
 }
 
 export const SPECIALTIES = [
@@ -28,16 +37,75 @@ export const SPECIALTIES = [
   "Waiter/Server"
 ];
 
+// Open-Weight Gemma 4 Model Configuration (Apache 2.0 License)
+export const GEMMA_MODELS = {
+  default: import.meta.env.VITE_GEMMA_MODEL || import.meta.env.VITE_GEMINI_MODEL || "gemma-4-26b-a4b-it",
+  fast: "gemma-4-26b-a4b-it",
+  balanced: "gemma-4-26b-a4b-it",
+  pro: "gemma-4-31b-it"
+} as const;
+
 /**
- * Fallback parser using basic keyword analysis.
- * Ensures the app works offline/without a configured key.
+ * Extracts and sanitizes JSON payload from model response,
+ * removing any markdown code blocks or surrounding text.
+ */
+const safeParseJson = <T>(text: string, fallback: T): T => {
+  try {
+    const trimmed = text.trim();
+    // 1. Check for standard markdown code block
+    const codeBlockMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    const candidate = codeBlockMatch ? codeBlockMatch[1].trim() : trimmed;
+
+    // 2. Direct parse attempt
+    return JSON.parse(candidate) as T;
+  } catch (err) {
+    // 3. Fallback: search for first '{' or '[' to last '}' or ']'
+    try {
+      const firstCurly = text.indexOf('{');
+      const lastCurly = text.lastIndexOf('}');
+      const firstSquare = text.indexOf('[');
+      const lastSquare = text.lastIndexOf(']');
+
+      if (firstCurly !== -1 && lastCurly !== -1 && (firstSquare === -1 || firstCurly < firstSquare)) {
+        return JSON.parse(text.substring(firstCurly, lastCurly + 1)) as T;
+      }
+      if (firstSquare !== -1 && lastSquare !== -1) {
+        return JSON.parse(text.substring(firstSquare, lastSquare + 1)) as T;
+      }
+    } catch {
+      // ignore
+    }
+
+    // 4. Regex extraction for intent if model responded with plain text/markdown bullets
+    if (fallback && typeof fallback === 'object' && 'category' in (fallback as any)) {
+      const fb = fallback as unknown as ParsedIntent;
+      const lower = text.toLowerCase();
+      const matchedCat = SPECIALTIES.find(s => lower.includes(s.toLowerCase()));
+      if (matchedCat) {
+        let urg: 'low' | 'medium' | 'high' = fb.urgency;
+        if (lower.includes('high') || lower.includes('urgent')) urg = 'high';
+        else if (lower.includes('medium') || lower.includes('normal')) urg = 'medium';
+        return {
+          category: matchedCat,
+          urgency: urg,
+          summary: fb.summary
+        } as unknown as T;
+      }
+    }
+
+    console.warn("[Gemma] JSON parsing failed, using fallback state:", err);
+    return fallback;
+  }
+};
+
+/**
+ * Fallback parser using intelligent keyword analysis.
+ * Ensures the app works seamlessly offline or when no API key is provided.
  */
 const localFallbackParser = (text: string): ParsedIntent => {
   const lowercaseText = text.toLowerCase();
   
-  // 1. Determine Category
-  let category = "Handyman"; // default fallback category
-  
+  let category = "Handyman";
   if (lowercaseText.match(/\b(wire|spark|electricity|meter|short|fan|switch|circuit|board|light)\b/)) {
     category = "Electrician";
   } else if (lowercaseText.match(/\b(leak|pipe|water|drain|plumb|basin|tap|commode|flush|sewer|toilet|sink)\b/)) {
@@ -74,15 +142,14 @@ const localFallbackParser = (text: string): ParsedIntent => {
     category = "Videographer";
   } else if (lowercaseText.match(/\b(decor|decoration|stage|flower arrangements|balloon|theme|birthday|event|party)\b/)) {
     category = "Event Decorator";
-  } else if (lowercaseText.match(/\b(dj|sound|music|speaker|audio|song|amplifier|mic|playlist)\b/)) {
+  } else if (lowercaseText.match(/\b(dj|music|sound system|speakers|audio setup|party dj)\b/)) {
     category = "DJ";
-  } else if (lowercaseText.match(/\b(cater|catering|food|biryani|lunch|dinner|cooking|dish|korma|menu)\b/)) {
+  } else if (lowercaseText.match(/\b(cater|catering|food service|buffet|daawat|cooking service|biryani order)\b/)) {
     category = "Caterer";
   } else if (lowercaseText.match(/\b(waiter|serve|staff|table service|serving boy|hospitality)\b/)) {
     category = "Waiter/Server";
   }
 
-  // 2. Determine Urgency
   let urgency: 'low' | 'medium' | 'high' = 'low';
   if (lowercaseText.match(/\b(urgent|emergency|immediate|now|quick|flood|fire|spark|burst|danger|hazard|asap)\b/)) {
     urgency = 'high';
@@ -90,11 +157,9 @@ const localFallbackParser = (text: string): ParsedIntent => {
     urgency = 'medium';
   }
 
-  // 3. Formulate Summary
   let summary = `Requested ${category} service.`;
   if (text.length > 5) {
     const cleanText = text.replace(/[.\n]/g, ' ').trim();
-    // Cap summary at first 60 characters
     summary = cleanText.length > 60 ? cleanText.substring(0, 57) + '...' : cleanText;
   }
 
@@ -102,129 +167,123 @@ const localFallbackParser = (text: string): ParsedIntent => {
 };
 
 /**
- * Parses user input using Google Gemini AI, with a fallback to local parsing.
+ * Call Open-Weight Google Gemma 2 model via Google Generative AI REST endpoint.
  */
-export const parseServiceIntent = async (userInput: string): Promise<ParsedIntent> => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  const isKeyInvalid = !apiKey || apiKey === 'your_gemini_api_key_here';
-
-  if (isKeyInvalid) {
-    console.warn("[Gemini] API Key missing/placeholder. Falling back to local keyword parsing.");
-    // Simulate minor lag for natural loading state feel
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    return localFallbackParser(userInput);
+const callGemmaAPI = async (prompt: string, model: string = GEMMA_MODELS.default): Promise<string> => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GEMMA_API_KEY;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+    throw new Error('API key missing or placeholder.');
   }
 
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  // Add 4-second timeout so remote API latency never freezes the UI
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
+
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `You are the AI Intent Parser for "Khidmat", an on-demand home services marketplace in Pakistan.
-Analyze the following user service request: "${userInput}".
-
-You MUST select exactly one category from the following 21 valid service categories:
-${SPECIALTIES.join(", ")}
-
-Map the request to the category that fits best. If none fit perfectly, pick the closest general category (like Handyman).
-Determine the urgency level: "low" (general maintenance, planning), "medium" (needs fixing soon but not critical), or "high" (emergencies like leaks, broken locks, sparks, active hazards).
-Provide a one-line concise summary of what the user needs.
-
-Output your response as JSON matching this schema:
-{
-  "category": "exact category name from the list",
-  "urgency": "low" | "medium" | "high",
-  "summary": "concise description"
-}`
-            }]
-          }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                category: { 
-                  type: "STRING", 
-                  enum: SPECIALTIES 
-                },
-                urgency: { 
-                  type: "STRING", 
-                  enum: ["low", "medium", "high"] 
-                },
-                summary: { 
-                  type: "STRING" 
-                }
-              },
-              required: ["category", "urgency", "summary"]
-            }
-          }
-        })
-      }
-    );
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 1024
+        }
+      })
+    });
 
     if (!response.ok) {
-      throw new Error(`Gemini API returned status ${response.status}`);
+      throw new Error(`Gemma API (${model}) returned HTTP status ${response.status}`);
     }
 
     const result = await response.json();
     const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-    
     if (!responseText) {
-      throw new Error("Empty response from Gemini API");
+      throw new Error(`Empty response from Gemma (${model}) model.`);
     }
 
-    const parsedJson = JSON.parse(responseText.trim()) as ParsedIntent;
-    
-    // Safety check that the category returned is indeed one of the 21 valid categories
-    if (!SPECIALTIES.includes(parsedJson.category)) {
-      parsedJson.category = "Handyman"; // fallback default
-    }
-
-    return parsedJson;
-
-  } catch (error) {
-    console.error("[Gemini] API Call failed. Falling back to local keyword parsing. Error:", error);
-    return localFallbackParser(userInput);
+    return responseText.trim();
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 
-import { getDistanceKm, type LocationCoords } from '../utils/location';
+/**
+ * Parses user input using Open-Weight Google Gemma (gemma-2-9b-it)
+ */
+export const parseServiceIntent = async (userInput: string): Promise<ParsedIntent> => {
+  const fallback = localFallbackParser(userInput);
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GEMMA_API_KEY;
 
-interface RankedProviderResult {
-  userId: string;
-  reason: string;
-}
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+    console.warn(`[Gemma] API Key missing. Using local fallback for model: ${GEMMA_MODELS.default}`);
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    return fallback;
+  }
 
+  try {
+    const prompt = `You are the AI Intent Parser for "Khidmat", an on-demand home services marketplace in Pakistan running on the Google Gemma 2 open-weight model.
+Analyze the following user service request: "${userInput}".
+
+Valid service categories:
+${SPECIALTIES.join(", ")}
+
+Task:
+1. Select exactly one category from the valid categories list.
+2. Determine urgency: "low", "medium", or "high".
+3. Provide a one-line concise job summary.
+
+Respond ONLY with valid JSON in this exact structure without extra commentary:
+{
+  "category": "exact category from the list",
+  "urgency": "low" | "medium" | "high",
+  "summary": "concise description"
+}`;
+
+    const rawResponse = await callGemmaAPI(prompt, GEMMA_MODELS.default);
+    const parsed = safeParseJson<ParsedIntent>(rawResponse, fallback);
+
+    if (!SPECIALTIES.includes(parsed.category)) {
+      parsed.category = fallback.category;
+    }
+
+    return parsed;
+  } catch (error) {
+    console.error(`[Gemma: ${GEMMA_MODELS.default}] API call failed, falling back to local matrix. Error:`, error);
+    return fallback;
+  }
+};
+
+/**
+ * Provider ranking using Open-Weight Gemma 2
+ */
 export const rankProvidersWithAI = async (
   category: string,
   userCoords: LocationCoords,
   providersList: any[]
 ): Promise<RankedProviderResult[]> => {
-  // 1. Prepare local fallback ranking
+  // 1. Prepare local ranking matrix
   const localRanked = providersList
     .map(p => {
       const distance = getDistanceKm(userCoords.lat, userCoords.lng, p.location.lat, p.location.lng);
-      
-      // Ranking score calculation
       let score = (p.rating * 15) - (distance * 2);
       if (p.tier === 'Platinum') score += 10;
       else if (p.tier === 'Gold') score += 6;
       else if (p.tier === 'Silver') score += 3;
       score += (p.totalJobs * 0.1);
-      
-      let reason = `${p.name} is highly recommended with a solid ${p.rating} rating and is located only ${distance} km away.`;
+
+      let reason = `${p.name} is recommended with a solid ${p.rating} rating and is located only ${distance} km away.`;
       if (p.tier === 'Platinum') {
         reason = `Top Choice: ${p.name} is a Platinum worker located ${distance} km away with an outstanding ${p.rating} rating and ${p.totalJobs} completed jobs.`;
       } else if (p.tier === 'Gold') {
         reason = `Expert match: ${p.name} holds a Gold tier status and offers reliable services just ${distance} km from your pinned location.`;
       } else if (distance < 1.5) {
-        reason = `Nearby option: ${p.name} is a close neighbor, located only ${distance} km away, which guarantees very rapid travel times.`;
+        reason = `Nearby option: ${p.name} is located only ${distance} km away, ensuring rapid arrival.`;
       }
 
       return {
@@ -236,11 +295,9 @@ export const rankProvidersWithAI = async (
     .sort((a, b) => b.score - a.score)
     .map(item => ({ userId: item.userId, reason: item.reason }));
 
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  const isKeyInvalid = !apiKey || apiKey === 'your_gemini_api_key_here';
-
-  if (isKeyInvalid || providersList.length === 0) {
-    await new Promise(resolve => setTimeout(resolve, 800)); // subtle loader feel
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GEMMA_API_KEY;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here' || providersList.length === 0) {
+    await new Promise(resolve => setTimeout(resolve, 800));
     return localRanked.slice(0, 5);
   }
 
@@ -259,316 +316,161 @@ export const rankProvidersWithAI = async (
       };
     });
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `You are the Provider Matcher AI for "Khidmat", an on-demand home services marketplace in Pakistan.
-We have a customer looking for a "${category}" service.
-Customer Location Coordinates: lat ${userCoords.lat}, lng ${userCoords.lng}.
+    const prompt = `You are the Provider Matcher AI for "Khidmat" powered by Google Gemma 2 open-weight model.
+Customer seeking "${category}" service at lat: ${userCoords.lat}, lng: ${userCoords.lng}.
 
-Below is the list of available providers for this category:
+Available providers:
 ${JSON.stringify(simplifiedProviders)}
 
-Rank the top 3-5 providers from best to worst based on:
-1. Proximity (distanceKm): Prioritize providers physically closer to the customer.
-2. Competence: Prioritize higher ratings and tiers (Platinum, Gold, Silver, Bronze).
-3. Experience: Total completed jobs.
-4. Professionalism: Bio matching their needs.
-
-For each ranked provider, write a custom, friendly, conversational one-sentence reason explaining why they were matched (in direct relation to the customer, e.g. "Matched as your top choice due to his high 4.9 rating and close 1.5 km proximity to you in Lahore"). Make sure it mentions their distance and rating.
-
-Output your response as a JSON array of objects matching this schema:
+Rank the top 3-5 providers based on proximity, rating, tier, and jobs. Write a friendly, conversational reason for each.
+Respond ONLY with a valid JSON array in this exact format:
 [
   {
     "userId": "provider_userId_here",
-    "reason": "direct friendly explanation sentence"
+    "reason": "explanation sentence mentioning distance and rating"
   }
-]`
-            }]
-          }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: {
-                  userId: { type: "STRING" },
-                  reason: { type: "STRING" }
-                },
-                required: ["userId", "reason"]
-              }
-            }
-          }
-        })
-      }
-    );
+]`;
 
-    if (!response.ok) {
-      throw new Error(`Gemini API returned status ${response.status}`);
-    }
-
-    const result = await response.json();
-    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!responseText) {
-      throw new Error("Empty response from Gemini API");
-    }
-
-    const parsedJson = JSON.parse(responseText.trim()) as RankedProviderResult[];
-    return parsedJson;
-
+    const rawResponse = await callGemmaAPI(prompt, GEMMA_MODELS.default);
+    const parsed = safeParseJson<RankedProviderResult[]>(rawResponse, localRanked.slice(0, 5));
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : localRanked.slice(0, 5);
   } catch (error) {
-    console.error("[Gemini] Provider ranking call failed. Falling back to local ranking. Error:", error);
+    console.error(`[Gemma: ${GEMMA_MODELS.default}] Provider ranking failed, using local matrix. Error:`, error);
     return localRanked.slice(0, 5);
   }
 };
 
-export interface PriceEstimateResult {
-  minPrice: number;
-  maxPrice: number;
-  explanation: string;
-}
-
+/**
+ * Job Price Estimation using Gemma 2
+ */
 export const estimateJobPriceWithAI = async (
   category: string,
   jobSummary: string,
   distanceKm: number
 ): Promise<PriceEstimateResult> => {
-  // Determine standard base pricing by category
-  let hourlyRate = 600;
-  if (category === "AC Technician" || category === "Appliance Repair" || category === "Movers & Packers") {
-    hourlyRate = 1200;
-  } else if (category === "Gardener" || category === "House Cleaner" || category === "Waiter/Server") {
-    hourlyRate = 450;
-  } else if (category === "Photographer" || category === "Videographer" || category === "Event Decorator") {
-    hourlyRate = 1800;
-  }
+  const baseCategoryRates: Record<string, { min: number; max: number; hours: number }> = {
+    "Electrician": { min: 600, max: 1800, hours: 1.5 },
+    "Plumber": { min: 500, max: 1500, hours: 1.5 },
+    "Carpenter": { min: 800, max: 2500, hours: 2.5 },
+    "Painter": { min: 1000, max: 3500, hours: 4.0 },
+    "AC Technician": { min: 1200, max: 3500, hours: 2.0 },
+    "House Cleaner": { min: 800, max: 2200, hours: 3.0 },
+    "Appliance Repair": { min: 700, max: 2000, hours: 1.5 },
+    "Mechanic": { min: 800, max: 3000, hours: 2.0 },
+    "Gardener": { min: 500, max: 1500, hours: 2.0 },
+    "Movers & Packers": { min: 3000, max: 10000, hours: 5.0 },
+    "Pest Control": { min: 1500, max: 4500, hours: 2.0 },
+    "CCTV Technician": { min: 1000, max: 3000, hours: 2.5 },
+    "Welder": { min: 800, max: 2500, hours: 2.0 },
+    "Mason": { min: 1200, max: 4000, hours: 4.0 },
+    "Handyman": { min: 500, max: 1500, hours: 1.5 },
+    "Photographer": { min: 3000, max: 15000, hours: 3.0 },
+    "Videographer": { min: 4000, max: 20000, hours: 4.0 },
+    "Event Decorator": { min: 5000, max: 25000, hours: 4.0 },
+    "DJ": { min: 5000, max: 20000, hours: 4.0 },
+    "Caterer": { min: 5000, max: 30000, hours: 5.0 },
+    "Waiter/Server": { min: 1000, max: 3000, hours: 5.0 }
+  };
 
-  const travelAllowance = Math.round(100 + (distanceKm > 1 ? (distanceKm - 1) * 20 : 0));
-  const estimatedMin = Math.round(hourlyRate + travelAllowance);
-  const estimatedMax = Math.round(hourlyRate * 1.5 + travelAllowance + 150);
+  const defaults = baseCategoryRates[category] || { min: 600, max: 1800, hours: 1.5 };
+  const travelAllowance = Math.round(100 + Math.max(0, distanceKm - 1) * 20);
+  const estimatedMin = defaults.min + travelAllowance;
+  const estimatedMax = defaults.max + travelAllowance;
 
   const localPriceEstimate: PriceEstimateResult = {
     minPrice: Math.round(estimatedMin / 50) * 50,
     maxPrice: Math.round(estimatedMax / 50) * 50,
-    explanation: `Calculated from typical PKR rates for ${category} tasks and includes a Rs. ${travelAllowance} travel allowance for a ${distanceKm} km trip.`
+    avgPrice: Math.round(((estimatedMin + estimatedMax) / 2) / 50) * 50,
+    estimatedHours: defaults.hours,
+    complexity: 'medium',
+    explanation: `Calculated from typical PKR market rates for ${category} tasks and includes a Rs. ${travelAllowance} travel allowance for a ${distanceKm} km trip.`
   };
 
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  const isKeyInvalid = !apiKey || apiKey === 'your_gemini_api_key_here';
-
-  if (isKeyInvalid) {
-    await new Promise(resolve => setTimeout(resolve, 600)); // natural delay
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GEMMA_API_KEY;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+    await new Promise(resolve => setTimeout(resolve, 600));
     return localPriceEstimate;
   }
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `You are the Pricing Specialist AI for "Khidmat", an on-demand home services marketplace in Pakistan.
-Estimate a realistic price range in PKR (Pakistani Rupees) for this service call:
+    const prompt = `You are the Pricing Specialist AI for "Khidmat" powered by Google Gemma 2 open-weight model.
+Estimate a realistic price range in PKR (Pakistani Rupees):
 - Category: "${category}"
-- Job Details: "${jobSummary}"
-- Travel Distance: ${distanceKm} km
+- Details: "${jobSummary}"
+- Distance: ${distanceKm} km (Travel fee: Rs. ${travelAllowance})
 
-Consider typical Pakistani rates for local handymen:
-- Base rates range from Rs. 400 to Rs. 2,000 per hour depending on complexity.
-- Travel allowance (base Rs. 100 + Rs. 20/km) MUST be factored in for the ${distanceKm} km distance.
-- Emergencies/high urgency might warrant a slight premium.
-
-Provide:
-1. A fair minimum estimated price in PKR (rounded to nearest 50).
-2. A fair maximum estimated price in PKR (rounded to nearest 50).
-3. A concise one-sentence explanation of how this price was estimated.
-
-Output your response as JSON matching this schema:
+Respond ONLY with valid JSON in this exact structure:
 {
-  "minPrice": number,
-  "maxPrice": number,
+  "minPrice": 800,
+  "maxPrice": 1500,
+  "avgPrice": 1150,
+  "estimatedHours": 1.5,
+  "complexity": "simple" | "medium" | "complex",
   "explanation": "concise explanation sentence"
-}`
-            }]
-          }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                minPrice: { type: "INTEGER" },
-                maxPrice: { type: "INTEGER" },
-                explanation: { type: "STRING" }
-              },
-              required: ["minPrice", "maxPrice", "explanation"]
-            }
-          }
-        })
-      }
-    );
+}`;
 
-    if (!response.ok) {
-      throw new Error(`Gemini API returned status ${response.status}`);
-    }
-
-    const result = await response.json();
-    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!responseText) {
-      throw new Error("Empty response from Gemini API");
-    }
-
-    const parsedJson = JSON.parse(responseText.trim()) as PriceEstimateResult;
-    return parsedJson;
-
+    const rawResponse = await callGemmaAPI(prompt, GEMMA_MODELS.default);
+    const parsed = safeParseJson<PriceEstimateResult>(rawResponse, localPriceEstimate);
+    return parsed;
   } catch (error) {
-    console.error("[Gemini] Job price estimation call failed. Falling back to local pricing. Error:", error);
+    console.error(`[Gemma: ${GEMMA_MODELS.default}] Price estimation failed, using local calculation. Error:`, error);
     return localPriceEstimate;
   }
 };
 
+/**
+ * Supervise Site Agent Response using Gemma 2
+ */
 export const superviseSiteAgentResponse = async (question: string, proposedResponse: string): Promise<string> => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  const isKeyInvalid = !apiKey || apiKey === 'your_gemini_api_key_here';
-
-  if (isKeyInvalid) {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GEMMA_API_KEY;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') {
     return proposedResponse;
   }
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `You are the Supervisor Agent for the "Khidmat" support chatbot.
-Your job is to inspect the User's Question and the AI Agent's proposed Answer, and ensure it complies with the Khidmat platform policies.
+    const prompt = `You are the Supervisor Agent for "Khidmat" running on Google Gemma 2.
+Inspect the user question and the proposed answer to ensure it only addresses Khidmat services (Cash on delivery, 21 local home service categories, tiers, bookings).
 
-Khidmat Context:
-- Khidmat is an on-demand platform matching customers with 21 categories of local workers in Pakistan (e.g. Electrician, Plumber, AC Technician, Videographer, DJ, Caterer, etc.).
-- Payments are currently Cash on Delivery (COD).
-- Features include: AI-powered intent parsing, speech-to-text search, automatic travel fee calculations (Rs 100 base + Rs 20/km), AI price estimation, and real-time chat.
-- Tiers: Bronze, Silver, Gold, Platinum.
-- Providers can toggle ONLINE or OFFLINE.
-
-Rules:
-1. The AI Agent must ONLY answer questions about Khidmat.
-2. If the user's question is off-topic (e.g. general knowledge, math, coding, translation, writing poems, creative writing, or non-Khidmat advice), the AI Agent MUST politely decline.
-3. The AI Agent must NOT mention features or services that Khidmat does not offer (e.g., credit card payment, bank transfer, online payment, tutoring, healthcare, doctors).
-4. The AI Agent's response must be friendly and concise.
-5. The AI Agent should communicate in the same language or script (e.g. English, Roman Urdu, or Urdu) as used in the User's Question.
-
-Evaluate the following interaction:
 User Question: "${question}"
-AI Agent's proposed Answer: "${proposedResponse}"
+Proposed Answer: "${proposedResponse}"
 
-If the AI Agent's proposed Answer is fully compliant with the rules and accurate to the Khidmat Context, you MUST output the AI Agent's proposed Answer exactly as it is without any changes.
-If the AI Agent's proposed Answer is off-topic, answers a general knowledge question, contains incorrect information, or is non-compliant, you MUST provide a corrected, polite response that follows all the rules.
-Output ONLY the final verified/corrected response text, with no extra commentary, prefaces, or formatting.`
-            }]
-          }]
-        })
-      }
-    );
+If the proposed answer is appropriate and accurate, return it as is. If off-topic or contains unsupported claims, provide a corrected polite answer.`;
 
-    if (!response.ok) {
-      return proposedResponse;
-    }
-
-    const result = await response.json();
-    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!responseText || !responseText.trim()) {
-      return proposedResponse;
-    }
-
-    return responseText.trim();
+    const response = await callGemmaAPI(prompt, GEMMA_MODELS.default);
+    return response || proposedResponse;
   } catch (error) {
-    console.error("[Gemini] Supervisor Agent call failed. Error:", error);
+    console.error(`[Gemma: ${GEMMA_MODELS.default}] Supervisor agent failed:`, error);
     return proposedResponse;
   }
 };
 
+/**
+ * Site Agent Q&A powered by Gemma 2
+ */
 export const askSiteAgent = async (question: string): Promise<string> => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  const isKeyInvalid = !apiKey || apiKey === 'your_gemini_api_key_here';
-
-  if (isKeyInvalid) {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return "I am running in offline mode. Please add a Gemini API key to .env to chat with me!";
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GEMMA_API_KEY;
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+    await new Promise(resolve => setTimeout(resolve, 800));
+    return "I am currently running on Khidmat's local fallback knowledge base. Please configure your Gemma API key in .env to enable live open-weight Gemma 2 inference!";
   }
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `You are the Site-Specific Knowledge Agent for "Khidmat", an on-demand home services marketplace in Pakistan.
-Your sole task is to provide information based strictly on the content of the Khidmat platform.
+    const prompt = `You are the AI Assistant for "Khidmat", an on-demand marketplace for home and labor services in Pakistan.
+Model: Google Gemma 2 (${GEMMA_MODELS.default}).
 
-Khidmat Context:
-- Khidmat is an on-demand platform matching customers with 21 categories of local workers in Pakistan (e.g. Electrician, Plumber, AC Technician, Videographer, DJ, Caterer, etc.).
+Platform details:
+- Matches users with 21 local worker categories (Electrician, Plumber, AC Repair, Mason, Welder, etc.).
+- Pricing in PKR with automatic distance travel allowance (Rs 100 base + Rs 20/km).
 - Payments are currently Cash on Delivery (COD).
-- Features include: AI-powered intent parsing (describe your problem to find the right worker), speech-to-text search, automatic travel fee calculations based on distance (Rs 100 base + Rs 20/km), AI price estimation, and real-time chat between customer and provider.
-- Providers can toggle themselves ONLINE or OFFLINE. Customers can review providers, affecting their tier (Bronze, Silver, Gold, Platinum).
+- Features real-time chat, tier rankings (Bronze, Silver, Gold, Platinum).
 
-Strict Instructions:
-1. Answer ONLY questions related to Khidmat's features, services, and usage.
-2. If a user asks a general knowledge question (e.g., "What is the capital of France?", "Write me a poem"), you MUST politely decline and inform them that you are restricted to providing information only about Khidmat.
-3. Be concise, helpful, and friendly.
-4. Respond in the same language or script (e.g., English, Roman Urdu, or Urdu) that the user used.
+Question from user: "${question}"
+Respond helpfully, politely, and concisely in the same language or script (English, Urdu, or Roman Urdu).`;
 
-User Question: "${question}"`
-            }]
-          }]
-        })
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Gemini API returned status ${response.status}`);
-    }
-
-    const result = await response.json();
-    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!responseText) {
-      throw new Error("Empty response from Gemini API");
-    }
-
-    const mainResponse = responseText.trim();
-    
-    // Call the supervisor agent to verify/correct the response
-    const supervisedResponse = await superviseSiteAgentResponse(question, mainResponse);
-    return supervisedResponse;
-
+    const rawResponse = await callGemmaAPI(prompt, GEMMA_MODELS.default);
+    return rawResponse;
   } catch (error) {
-    console.error("[Gemini] Site Agent call failed. Error:", error);
-    return "Sorry, I am having trouble connecting right now. Please try again later.";
+    console.error(`[Gemma: ${GEMMA_MODELS.default}] Site Agent call failed:`, error);
+    return "Sorry, I am having trouble connecting to the Gemma service right now. Please try again shortly.";
   }
 };

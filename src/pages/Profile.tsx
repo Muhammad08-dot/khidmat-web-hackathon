@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Mail, Phone, MapPin, Briefcase, Star, Clock, LogOut, ChevronLeft, Camera } from 'lucide-react';
-import { Card, Avatar } from '../components/ui/SharedUI';
+import { Mail, Phone, MapPin, Briefcase, Star, Clock, LogOut, ChevronLeft, Camera, Repeat } from 'lucide-react';
+import { Card, Avatar } from '../components/ui';
 import { TierBadge } from '../components/ui/TierBadge';
 import { uploadProfilePhoto } from '../services/firebase';
 
@@ -11,6 +11,7 @@ export const Profile: React.FC = () => {
   const { user, userProfile, logout, updateProfile } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [switchingRole, setSwitchingRole] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -18,6 +19,31 @@ export const Profile: React.FC = () => {
       navigate('/auth');
     } catch (err) {
       console.error("Failed to log out:", err);
+    }
+  };
+
+  const handleSwitchRole = async () => {
+    if (!userProfile) return;
+    setSwitchingRole(true);
+    const targetRole = userProfile.role === 'provider' ? 'customer' : 'provider';
+    
+    try {
+      const updates: any = { role: targetRole };
+      if (targetRole === 'provider' && !userProfile.category) {
+        updates.category = 'Handyman';
+        updates.tier = userProfile.tier || 'Silver';
+        updates.rating = userProfile.rating || 4.9;
+        updates.totalJobs = userProfile.totalJobs || 12;
+        updates.basePrice = userProfile.basePrice || 800;
+        updates.available = true;
+      }
+      
+      await updateProfile(updates);
+      navigate('/');
+    } catch (err) {
+      console.error("Failed to switch role:", err);
+    } finally {
+      setSwitchingRole(false);
     }
   };
 
@@ -65,7 +91,7 @@ export const Profile: React.FC = () => {
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={() => navigate(-1)}
-          className="w-10 h-10 rounded-full border border-gray-200 dark:border-slate-800 flex items-center justify-center text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800/50 transition-colors"
+          className="w-10 h-10 rounded-full border border-gray-200 dark:border-slate-800 flex items-center justify-center text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -99,15 +125,46 @@ export const Profile: React.FC = () => {
               <TierBadge tier={userProfile.tier} />
             )}
           </h2>
-          <p className="text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-fixed mt-1">
-            {isProvider ? 'Service Provider' : 'Client / Customer'}
-          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
+              isProvider
+                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800'
+                : 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-300 dark:border-blue-800'
+            }`}>
+              {isProvider ? '🛠️ Active as Service Provider' : '🛒 Active as Client / Customer'}
+            </span>
+          </div>
 
           {isProvider && userProfile.bio && (
             <p className="text-sm text-gray-500 dark:text-slate-400 mt-4 max-w-md italic leading-relaxed">
               "{userProfile.bio}"
             </p>
           )}
+        </Card>
+
+        {/* Dual-Role Switcher Card */}
+        <Card className="p-6 border border-emerald-500/20 bg-gradient-to-r from-emerald-500/5 to-teal-500/5 dark:from-emerald-950/20 dark:to-teal-950/20">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Dual-Profile Marketplace</p>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white mt-0.5">
+                {isProvider ? 'Switch to Customer View' : 'Switch to Provider Dashboard'}
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                {isProvider
+                  ? 'Browse 21 categories, use voice search, and hire other verified experts.'
+                  : 'Manage incoming job leads, track PKR earnings, and toggle your live availability.'}
+              </p>
+            </div>
+            <button
+              onClick={handleSwitchRole}
+              disabled={switchingRole}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold shadow-soft transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
+            >
+              <Repeat className="w-4 h-4" />
+              <span>{switchingRole ? 'Switching...' : isProvider ? 'Switch to Customer' : 'Switch to Provider'}</span>
+            </button>
+          </div>
         </Card>
 
         {/* Account Details Card */}

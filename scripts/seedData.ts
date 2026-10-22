@@ -1,5 +1,5 @@
-import { isMockFirebase, writeDocument, getCollectionDocs } from '../services/firebase';
-import { PAKISTAN_CITIES, type LocationCoords } from './location';
+import { isMockFirebase, writeDocument, getCollectionDocs } from '../src/services/firebase';
+import { PAKISTAN_CITIES, type LocationCoords } from '../src/utils/location';
 
 export interface Provider {
   userId: string;

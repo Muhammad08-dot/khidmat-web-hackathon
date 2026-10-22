@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
-import { ProviderHome } from './ProviderHome';
+import { ProviderHome } from './provider/ProviderHome';
 import { 
   Zap, 
   Droplet, 
@@ -320,7 +320,7 @@ const CustomerHome: React.FC = () => {
               Why We Created Khidmat
             </h2>
             <p className="text-sm text-on-surface-variant dark:text-slate-350 leading-relaxed">
-              Khidmat was created for the <strong>DYLP Hackathon</strong> with a simple but powerful mission: to bridge the gap between skilled blue-collar service professionals and Pakistani households. 
+              Khidmat was created with a simple but powerful mission: to bridge the gap between skilled blue-collar service professionals and Pakistani households. 
             </p>
             <p className="text-sm text-on-surface-variant dark:text-slate-350 leading-relaxed">
               We realized that finding trustworthy, verified help for home maintenance shouldn't require complex phone directories or unsafe third-party suggestions. By digitizing safety rules, identity validation, and fair-pricing estimations, Khidmat protects customers from arbitrary rate hikes while guaranteeing micro-task earners a reliable pipeline of local jobs.

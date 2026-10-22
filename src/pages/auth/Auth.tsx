@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { 
   Mail, 
   Lock, 
@@ -15,8 +15,8 @@ import {
   Map,
   Camera
 } from 'lucide-react';
-import { MapSelector } from '../components/features/MapSelector';
-import { PAKISTAN_CITIES, type LocationCoords } from '../utils/location';
+import { MapSelector } from '../../components/features/MapSelector';
+import { PAKISTAN_CITIES, type LocationCoords } from '../../utils/location';
 
 export const Auth: React.FC = () => {
   const { signIn, signUp } = useAuth();

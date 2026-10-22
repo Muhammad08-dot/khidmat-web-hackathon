@@ -9,28 +9,9 @@ import {
   writeDocument,
   uploadProfilePhoto
 } from '../services/firebase';
+import type { UserProfile } from '../types';
 
-interface UserProfile {
-  name: string;
-  email: string;
-  phone: string;
-  city: string;
-  role: 'customer' | 'provider';
-  location: { lat: number; lng: number };
-  createdAt: string;
-  category?: string;
-  bio?: string;
-  basePrice?: number;
-  rating?: number;
-  totalJobs?: number;
-  tier?: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
-  available?: boolean;
-  photoURL?: string;
-  totalEarnings?: number;
-  jobsHistory?: string[];
-}
-
-interface AuthContextType {
+export interface AuthContextType {
   user: any | null;
   userProfile: UserProfile | null;
   loading: boolean;
@@ -50,7 +31,7 @@ interface AuthContextType {
   updateProfile: (newData: Partial<UserProfile>) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any | null>(null);

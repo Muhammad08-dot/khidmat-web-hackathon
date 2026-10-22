@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getDocument } from '../services/firebase';
-import { TierBadge } from '../components/ui/TierBadge';
-import { Avatar } from '../components/ui/SharedUI';
+import { getDocument } from '../../services/firebase';
+import { TierBadge, Avatar } from '../../components/ui';
 import { 
   ArrowLeft, 
   Star, 

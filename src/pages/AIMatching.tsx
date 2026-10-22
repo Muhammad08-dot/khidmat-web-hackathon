@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { parseServiceIntent, type ParsedIntent } from '../services/gemini';
 import { useAuth } from '../contexts/AuthContext';
-import { Card, EmptyState } from '../components/ui/SharedUI';
+import { Card, EmptyState } from '../components/ui';
 
 // Map categories to Lucide icons
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {

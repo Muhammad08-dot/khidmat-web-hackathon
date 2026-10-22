@@ -1,19 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useAuth } from '../contexts/AuthContext';
-import { getCollectionDocs } from '../services/firebase';
-import { Card, EmptyState, Avatar } from '../components/ui/SharedUI';
+import { useAuth } from '../../contexts/AuthContext';
+import { getCollectionDocs } from '../../services/firebase';
+import { Card, EmptyState, Avatar, TierBadge } from '../../components/ui';
 import { 
   rankProvidersWithAI, 
   estimateJobPriceWithAI, 
   type PriceEstimateResult 
-} from '../services/gemini';
+} from '../../services/gemini';
 import { 
   getDistanceKm, 
   estimateTravelTimeMinutes
-} from '../utils/location';
-import { TierBadge } from '../components/ui/TierBadge';
+} from '../../utils/location';
 import { 
   MapPin, 
   Clock, 
@@ -114,14 +113,14 @@ export const ProviderList: React.FC = () => {
 
         // Map reasons to provider UIDs
         const reasonsMap: Record<string, string> = {};
-        rankedList.forEach(item => {
+        rankedList.forEach((item: any) => {
           reasonsMap[item.userId] = item.reason;
         });
 
         // 5. Re-order matched providers based on the AI ranked order
         const rankedProviders = [...matchedProviders].sort((a, b) => {
-          const indexA = rankedList.findIndex(item => item.userId === a.userId);
-          const indexB = rankedList.findIndex(item => item.userId === b.userId);
+          const indexA = rankedList.findIndex((item: any) => item.userId === a.userId);
+          const indexB = rankedList.findIndex((item: any) => item.userId === b.userId);
           
           // Put ranked items first, unranked items at the bottom
           const scoreA = indexA === -1 ? 999 : indexA;

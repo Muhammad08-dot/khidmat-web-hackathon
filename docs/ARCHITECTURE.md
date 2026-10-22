@@ -31,27 +31,33 @@ graph TD
 ```
 
 ### 🛣️ Routing & Route Connections (`src/App.tsx`)
-The app uses React Router for page transitions:
-1.  **`/` (Home)**: Search bar (with Speech Recognition) and category grid selection.
-2.  **`/auth` (Auth)**: Handles login, registration, and location coordinate selection.
-3.  **`/matching` (AI Matching)**: Shows the AI scanning radar and processes searches.
-4.  **`/providers` (Provider List)**: Lists ranked providers with travel fee details and AI pricing estimates.
-5.  **`/provider/:id` (Provider Profile)**: Displays biography, pricing, reviews, and tier awards.
-6.  **`/booking` (Confirm Booking)**: Form to schedule appointments, calculate distance, and finalize prices.
-7.  **`/inbox` (Inbox)**: Dedicated messaging dashboard listing active conversation logs.
-8.  **`/chat` (Chat)**: Real-time chat dialogue screen between customers and providers.
-9.  **`/bookings` (Bookings)**: Dashboard listing active and history bookings. Allows customers to submit reviews.
-10. **`/profile` (Profile)**: Displays profile metrics, business statistics, and sign out controls.
+The app uses React Router with lazy loading (`React.lazy + Suspense`):
+1.  **`/` (Home)**: Search bar (with Speech Recognition) and category grid selection. (`src/pages/Home.tsx`)
+2.  **`/auth` (Auth)**: Handles login, registration, and coordinate selection. (`src/pages/auth/Auth.tsx`)
+3.  **`/matching` (AI Matching)**: Shows the AI scanning radar and processes searches. (`src/pages/AIMatching.tsx`)
+4.  **`/providers` (Provider List)**: Lists ranked providers with travel fee details. (`src/pages/provider/ProviderList.tsx`)
+5.  **`/provider/:id` (Provider Profile)**: Displays biography, pricing, reviews, and tier awards. (`src/pages/provider/ProviderProfile.tsx`)
+6.  **`/booking` (Confirm Booking)**: Form to schedule appointments and calculate distance. (`src/pages/booking/ConfirmBooking.tsx`)
+7.  **`/inbox` (Inbox)**: Dedicated messaging dashboard listing active conversations. (`src/pages/chat/Inbox.tsx`)
+8.  **`/chat` (Chat)**: Real-time chat dialogue screen between customers and providers. (`src/pages/chat/Chat.tsx`)
+9.  **`/bookings` (Bookings)**: Dashboard listing active and history bookings. (`src/pages/booking/MyBookings.tsx`)
+10. **`/profile` (Profile)**: Displays profile metrics and sign out controls. (`src/pages/Profile.tsx`)
+11. **`/categories` (Categories)**: Directory of all available services. (`src/pages/Categories.tsx`)
+12. **`/safety` (Safety)**: Safety tips and community guidelines. (`src/pages/Safety.tsx`)
 
 ### 🧩 Core Component Roles
 *   **`Navbar.tsx`**: Top header. Displays availability state controls for service providers (`ONLINE` vs `OFFLINE`), dark mode triggers, and the profile avatar dropdown with View Profile / Logout navigation.
 *   **`BottomNav.tsx`**: Mobile-specific navigation footer. Dynamically maps links to `/`, `/bookings`, `/inbox`, and `/profile`.
 *   **`MapSelector.tsx`**: Interactive geolocation pinning widget. Customers and providers drop a pin to select their coordinate latitude/longitude coordinates. Falls back to major city centers if maps are disabled.
-*   **`SharedUI.tsx`**: Standardized reusable layouts:
+*   **`src/components/ui/`**: Standardized reusable UI primitives:
     *   `<Card>`: Container implementing unified rounded edges, borders, backgrounds, and shadows.
     *   `<EmptyState>`: Standardized layout showing an icon, status headers, detail copy, and main CTA buttons for empty/error states.
-*   **`ProtectedRoute.tsx`**: Route gating mechanism. Includes a 5-second countdown timer fallback; if Firebase takes longer than 5 seconds to resolve, it defaults to redirecting users to the login screen.
-*   **`TierBadge.tsx`**: Renders visual indicator badges matching the provider level: Bronze, Silver, Gold, or Platinum.
+    *   `<Avatar>`: Resilient image avatar with initials/icon fallback.
+    *   `<Button>` & `<Input>`: Accessible standard forms and buttons.
+    *   `<TierBadge>`: Renders visual indicator badges matching the provider level: Bronze, Silver, Gold, or Platinum.
+*   **`ProtectedRoute.tsx`**: Route gating mechanism with fallback timeout.
+*   **`src/hooks/`**: Custom hooks (`useAuth`, `useBookings`, `useProviders`, `useUserLocation`).
+*   **`src/types/` & `src/constants/`**: Unified data types and shared configuration.
 
 ---
 

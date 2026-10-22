@@ -32,4 +32,5 @@ node_modules
 .gemini/
 .agents/
 stitch_khidmat_service_marketplace_app/
-
+# Media files
+*.mp4

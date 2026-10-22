@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { queryCollectionDocs, writeDocument } from '../services/firebase';
-import { Card, EmptyState, Avatar } from '../components/ui/SharedUI';
-import { TierBadge } from '../components/ui/TierBadge';
+import { useAuth } from '../../contexts/AuthContext';
+import { queryCollectionDocs, writeDocument } from '../../services/firebase';
+import { Card, EmptyState, Avatar, TierBadge } from '../../components/ui';
 import { 
   Star, 
   MapPin, 

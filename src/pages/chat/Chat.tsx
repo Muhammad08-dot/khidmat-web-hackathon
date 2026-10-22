@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { 
   getDocument, 
   writeDocument, 
   sendChatMessage, 
   listenToChatMessages 
-} from '../services/firebase';
-import { Card, EmptyState } from '../components/ui/SharedUI';
+} from '../../services/firebase';
+import { Card, EmptyState } from '../../components/ui';
 import { 
   ArrowLeft, 
   Send, 
@@ -102,7 +102,7 @@ export const Chat: React.FC = () => {
   useEffect(() => {
     if (!bookingId) return;
 
-    const unsubscribe = listenToChatMessages(bookingId, (newMessages) => {
+    const unsubscribe = listenToChatMessages(bookingId, (newMessages: any[]) => {
       setMessages(newMessages);
     });
 

@@ -4,7 +4,21 @@ on:
     types: [opened, reopened, synchronize]
 
 jobs:
+  check-ci:
+    name: Wait for CI Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for CI checks to pass
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          echo "Verifying PR readiness for auto-merge: $PR_URL"
+          gh pr checks "$PR_URL" --watch || true
+
   automerge:
+    name: Auto Merge
+    needs: [check-ci]
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -14,4 +28,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr merge "$PR_URL" --merge --admin
+        run: gh pr merge "$PR_URL" --merge --auto

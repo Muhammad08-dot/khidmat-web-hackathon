@@ -28,6 +28,25 @@
     background-color: #0F172A;
     color: #F8FAFC;
   }
+
+  /* Ensure all buttons and interactive elements always show pointer (hand shape) cursor */
+  button,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  input[type="checkbox"],
+  input[type="radio"],
+  select,
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  input:disabled {
+    cursor: not-allowed;
+  }
 }
 
 @layer utilities {

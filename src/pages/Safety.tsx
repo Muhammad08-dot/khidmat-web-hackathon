@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, ChevronLeft, CheckCircle2, UserCheck, PhoneCall, MapPin, Star } from 'lucide-react';
-import { Card } from '../components/ui/SharedUI';
+import { Card } from '../components/ui';
 
 export const Safety: React.FC = () => {
   const navigate = useNavigate();
