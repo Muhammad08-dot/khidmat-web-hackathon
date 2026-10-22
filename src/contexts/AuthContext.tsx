@@ -33,28 +33,41 @@ export interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Default active demo user session for instant hackathon evaluation without login friction
+const DEFAULT_DEMO_USER: UserProfile = {
+  name: 'Ahmed Khan',
+  email: 'ahmed.demo@khidmat.pk',
+  phone: '+923001234567',
+  city: 'Lahore',
+  role: 'customer',
+  location: { lat: 31.5204, lng: 74.3587 },
+  photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
+  createdAt: new Date().toISOString()
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<any | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any | null>({ uid: 'demo_user_01', email: 'ahmed.demo@khidmat.pk' });
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
+    const saved = localStorage.getItem('active_demo_profile');
+    if (saved) {
+      try { return JSON.parse(saved); } catch { /* ignore */ }
+    }
+    return DEFAULT_DEMO_USER;
+  });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Listen for auth changes
+    // Listen for real Firebase auth changes if available
     const unsubscribe = authSubscribe(async (currentUser) => {
-      setUser(currentUser);
-      
       if (currentUser) {
+        setUser(currentUser);
         try {
           const profile = await getUserProfile(currentUser.uid);
-          setUserProfile(profile as UserProfile);
+          if (profile) setUserProfile(profile as UserProfile);
         } catch (err) {
           console.error("Error fetching user profile from Firestore:", err);
-          setUserProfile(null);
         }
-      } else {
-        setUserProfile(null);
       }
-      
       setLoading(false);
     });
 
@@ -188,6 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
 
+    localStorage.setItem('active_demo_profile', JSON.stringify(updatedProfile));
     setUserProfile(updatedProfile);
   };
 
