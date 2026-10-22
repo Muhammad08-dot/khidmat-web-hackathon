@@ -50,7 +50,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
     const saved = localStorage.getItem('active_demo_profile');
     if (saved) {
-      try { return JSON.parse(saved); } catch { /* ignore */ }
+      try {
+        const parsed = JSON.parse(saved);
+        // Ensure name is Abdullah and not outdated 'hmm'
+        return { ...parsed, name: 'Abdullah', email: 'demo@khidmat.pk' };
+      } catch { /* ignore */ }
     }
     return DEFAULT_DEMO_USER;
   });

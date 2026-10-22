@@ -4,6 +4,12 @@
 
 ---
 
+## 📸 Application Interface Preview
+
+| Hero & Voice Search | 21 Service Categories Grid | Why Khidmat & Verification |
+|:---:|:---:|:---:|
+| ![Hero Search Banner](./docs/assets/hero_banner.png) | ![Explore Categories](./docs/assets/categories_grid.png) | ![Why We Created Khidmat](./docs/assets/why_khidmat.png) |
+
 ## 🎯 Scope & Focus
 This project was started before the hackathon. The authentication and database layers (Firebase Auth + Firestore) were pre-existing. During the hackathon, our focus was exclusively on the AI layer: integrating Google Gemma 4 (`gemma-4-26b-a4b-it`) for natural-language intent parsing, provider ranking, and PKR price estimation — with a graceful local fallback so the demo never breaks offline.
 
