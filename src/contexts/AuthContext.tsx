@@ -35,18 +35,18 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 // Default active demo user session for instant hackathon evaluation without login friction
 const DEFAULT_DEMO_USER: UserProfile = {
-  name: 'Ahmed Khan',
-  email: 'ahmed.demo@khidmat.pk',
+  name: 'Abdullah',
+  email: 'demo@khidmat.pk',
   phone: '+923001234567',
   city: 'Lahore',
   role: 'customer',
   location: { lat: 31.5204, lng: 74.3587 },
-  photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
+  photoURL: '',
   createdAt: new Date().toISOString()
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<any | null>({ uid: 'demo_user_01', email: 'ahmed.demo@khidmat.pk' });
+  const [user, setUser] = useState<any | null>({ uid: 'demo_user_01', email: 'demo@khidmat.pk' });
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
     const saved = localStorage.getItem('active_demo_profile');
     if (saved) {
