@@ -1,134 +1,154 @@
 # Khidmat (خدمت) — On-Demand Home Services Marketplace
 
-> **1-Line Pitch**: Pakistan's on-demand home services marketplace powered by Google Gemma 4 (`gemma-4-26b-a4b-it`) open-weight AI models for natural-language intent parsing, proximity-based provider ranking, and fair PKR price estimation.
+> **1-Line Pitch**: Pakistan's dual-role home services marketplace powered by Google Gemma 4 (`gemma-4-26b-a4b-it`) open-weight AI for natural-language intent parsing, proximity ranking, and fair PKR price estimation.
 
 ---
 
-## 📸 Application Interface Preview
+## 📸 Interface Preview
 
 | Hero & Voice Search | 21 Service Categories Grid | Why Khidmat & Verification |
 |:---:|:---:|:---:|
 | ![Hero Search Banner](./docs/assets/hero_banner.png) | ![Explore Categories](./docs/assets/categories_grid.png) | ![Why We Created Khidmat](./docs/assets/why_khidmat.png) |
 
-## 🎯 Scope & Focus
-This project was started before the hackathon. The authentication and database layers (Firebase Auth + Firestore) were pre-existing. During the hackathon, our focus was exclusively on the AI layer: integrating Google Gemma 4 (`gemma-4-26b-a4b-it`) for natural-language intent parsing, provider ranking, and PKR price estimation — with a graceful local fallback so the demo never breaks offline.
+---
+
+## 🎯 Core Value & Focus
+* **Dual-Profile Marketplace**: Single account allows users to switch seamlessly between **Customer** (hire services) and **Provider** (receive jobs & track earnings).
+* **Gemma 4 AI Engine**: Direct integration with Google's open-weight `gemma-4-26b-a4b-it` (Apache 2.0) via Google Generative Language REST endpoints.
+* **100% Fail-Proof**: Resilient client-side **Local Fallback Parser** kicks in under 10ms if network drops, ensuring zero demo failures.
 
 ---
 
-## 📜 Open Source & Model Licensing
-* **Application Code**: Licensed under the [MIT License](./LICENSE).
-* **AI Model Weights**: Powered by Google **Gemma 4 (`gemma-4-26b-a4b-it`)**, an open-weight model released under the [Apache 2.0 License](https://ai.google.dev/gemma/terms), accessed via the Gemini API.
+## 🏗️ System Architecture
+
+```mermaid
+graph TD
+    User([Customer / Service Provider]) -->|Role Switcher| Router{React Router v6}
+    
+    subgraph Client Application [React 19 + TypeScript + Vite 8]
+        Router -->|role = customer| CustomerPortal[Customer Marketplace Portal]
+        Router -->|role = provider| ProviderPortal[Provider Dashboard & Job Feed]
+        
+        CustomerPortal -->|Voice / Text Intent| AIMatcher[AI Matching Engine]
+        CustomerPortal -->|GPS Location| GeoModule[Haversine Proximity Engine]
+        ProviderPortal -->|Live Status| Beacon[Online / Offline Beacon]
+    end
+
+    subgraph Intelligence Layer [Google Gemma 4 AI]
+        AIMatcher -->|REST API v1beta| Gemma4[Google Gemma 4: gemma-4-26b-a4b-it]
+        Gemma4 -.->|Quota Limit / Timeout| Fallback[Local Fallback Matrix <10ms]
+        Gemma4 -->|Structured JSON| IntentResult[Category + Urgency + Fair PKR Price]
+        Fallback -->|Regex Match| IntentResult
+    end
+
+    subgraph Backend Infrastructure [Serverless BaaS]
+        IntentResult --> Firestore[(Google Cloud Firestore)]
+        ProviderPortal --> Firestore
+        Beacon --> Firestore
+        CustomerPortal --> Auth[(Firebase Auth)]
+    end
+```
 
 ---
 
-## 📋 Previous Work Declaration
-To maintain strict transparency regarding hackathon development guidelines, the breakdown of pre-existing foundation versus new work created during the event is detailed below:
+## 📁 Directory Structure
 
-| Dimension | Pre-Existing Prototype (Before Event) | Built During Hackathon (New AI Work) |
-|---|---|---|
-| **AI Integration** | None (Static regex keyword matchers only) | Integrated **Google Gemma 4 (`gemma-4-26b-a4b-it`)** open-weight model for natural-language Urdu/English intent parsing, proximity ranking, PKR price estimation, and prompt engineering |
-| **Local Fallback Engine** | None | Built resilient offline fallback matrix (`localFallbackParser`) ensuring zero disruption if API quotas or network connections drop |
-| **Architecture & Structure** | Monolithic files, single `SharedUI.tsx`, flat page hierarchy | Modular clean architecture: feature folders (`pages/auth`, `pages/booking`, `pages/provider`, `pages/chat`), decoupled UI primitives (`Card`, `Button`, `Input`, `Avatar`, `EmptyState`) |
-| **Auth & Database** | Pre-existing Firebase Auth and Firestore schema (pre-built supporting infrastructure) | Reused as background plumbing so 100% of event development focused on AI capabilities |
-| **Performance & Code-Splitting** | Eager bulk loading of all components | Implemented `React.lazy` + `Suspense` chunking with customized fallback loader |
-| **State & Reusability** | Direct Firestore calls inside view components | Built custom reusable hook layer: `useAuth`, `useBookings`, `useProviders`, and `useUserLocation` |
-| **Styling & Build Engine** | Legacy PostCSS configuration | Upgraded to official `@tailwindcss/vite` plugin with Tailwind v4 design tokens |
-| **Quality & CI/CD** | No test runner or automated pipelines | Comprehensive Vitest + Testing Library test suite, JSDOM setup, and automated GitHub Actions CI workflow |
+```text
+khidmat_web_app-main/
+├── .github/workflows/          # CI/CD Automated Pipelines
+├── docs/                       # Project Documentation & Screenshots
+│   └── assets/                 # UI Screenshots for README
+├── scripts/                    # Development & Seed Utilities
+│   └── seedData.ts             # 21-category localized mock database
+├── src/
+│   ├── components/             # UI atomic primitives, auth guards & widgets
+│   ├── contexts/               # AuthContext & Dual-Role Session Management
+│   ├── hooks/                  # Custom hooks (useAuth, useBookings, useProviders, useUserLocation)
+│   ├── layouts/                # Navbar (with Role Switcher), Footer, BottomNav
+│   ├── pages/
+│   │   ├── auth/               # Authentication (Customer / Provider registration)
+│   │   ├── booking/            # ConfirmBooking.tsx, MyBookings.tsx
+│   │   ├── chat/               # Real-time Chat & Inbox
+│   │   ├── provider/           # ProviderHome (Dashboard), ProviderList, ProviderProfile
+│   │   ├── AIMatching.tsx      # Voice scanning radar & Gemma 4 matching
+│   │   ├── Home.tsx            # Dynamic Root (CustomerHome vs ProviderHome)
+│   │   └── Profile.tsx         # User Profile & Dual-Profile Switcher Card
+│   ├── services/
+│   │   ├── firebase.ts         # Firestore, Auth, and fallback LocalStorage DB
+│   │   └── gemini.ts           # Google Gemma 4 REST integration & Local Fallback Parser
+│   ├── test/                   # Vitest unit test suite
+│   ├── types/                  # Global TypeScript contracts
+│   ├── App.tsx                 # Lazy-loaded router configuration
+│   └── index.css               # Tailwind CSS v4 design tokens
+├── LICENSE                     # MIT License
+├── package.json                # Project dependencies & scripts
+├── README.md                   # Project documentation
+└── vite.config.ts              # Vite 8 + Tailwind v4 bundler configuration
+```
+
+---
+
+## 🛠️ Complete Tech Stack
+
+| Layer | Technology | Version | Purpose |
+|---|---|---|---|
+| **AI Intelligence** | **Google Gemma 4** | `gemma-4-26b-a4b-it` | Open-weight model (Apache 2.0) for Roman Urdu intent parsing, provider ranking & PKR pricing. |
+| **Fail-Safe Fallback** | **Local Fallback Parser** | Built-in | Client-side rule matrix guaranteeing 100% demo uptime under low connectivity. |
+| **Frontend Core** | **React** | `v19.0.0` | Modern component-based SPA architecture with Concurrent features. |
+| **Language** | **TypeScript** | `v5.8.0` | Strict end-to-end type safety and compile-time verification. |
+| **Build & Tooling** | **Vite** | `v8.1.3` | Ultra-fast build tool and development server (`@tailwindcss/vite`). |
+| **Styling** | **Tailwind CSS** | `v4.0.0` | Modern CSS-first utility-driven styling engine with custom design tokens. |
+| **Animations** | **Framer Motion** | `v12.4.7` | Smooth animations, layout transitions, and audio visualizer. |
+| **Routing** | **React Router** | `v6.30.0` | Declarative client-side routing with code-splitting via `React.lazy`. |
+| **Icons** | **Lucide React** | `v1.16.0` | Crisp SVG icons for all 21 Pakistani service specialties. |
+| **Speech Engine** | **Web Speech API** | Native | In-browser speech-to-text recognition for hands-free Urdu/English queries. |
+| **Database & Auth** | **Firebase BaaS** | `v11.4.0` | Cloud Firestore real-time listeners and Firebase Auth sessions. |
+| **Testing** | **Vitest + RTL + JSDOM** | `v3.0.7` | Modern test runner and component assertions. |
 
 ---
 
 ## 🌟 Key Features
 
-### 1. Unified Search & Speech Recognition
-* **Speech-to-Text Search**: Powered by the browser-native `SpeechRecognition` API. Users can search by speaking directly into the microphone.
-* **Aesthetic Audio Visualizer**: Listening triggers an animated equalizer overlay.
-* **Demo Shortcuts**: Includes quick-access chips for effortless live presentation testing.
-
-### 2. Google Gemma 4 AI Intent Parser
-* **AI Matching Engine**: Powered by Google Gemma 4 (gemma-4-26b-a4b-it), an open-weight model released under the Apache 2.0 license, accessed via the Gemini API.
-* Analyzes plain text and voice transcripts (e.g. *"wiring inside the bathroom is sparking urgently"*).
-* Invokes **`gemma-4-26b-a4b-it`** via Google Generative AI REST endpoints.
-* Extracts structured JSON to categorize jobs across 21 local worker specialties, determine urgency (low, medium, high), and produce concise task summaries.
-* **Intelligent Fallback**: Gracefully falls back to a local scoring matrix if no API key is provided or offline.
-
-### 3. Automated Geolocation & Proximity Tracking
-* Instant browser geolocation (`navigator.geolocation.getCurrentPosition`) coordinates tracking.
-* Calculates actual travel distance (km) using the Haversine formula and computes automated travel allowances (Rs. 100 base + Rs. 20/km).
-
-### 4. Gemma 4 AI Provider Matcher & Price Estimator
-* **AI Ranking Engine**: Compares client coordinates with active specialists in their city, ranking candidates by proximity, customer ratings, completed jobs, and skills.
-* **AI PKR Price Ranges**: Computes realistic service price ranges in Pakistani Rupees (PKR) with contextual market explanations.
-
-### 5. InDrive-Style Availability & Dual-Role Experience
-* **Online/Offline Switch**: Providers can toggle their visibility with a live status beacon.
-* **Role-Based Portals**: Customers land on service discovery, while service providers land on a dedicated job dashboard tracking active requests, stats, and PKR earnings.
-
-### 6. Real-Time Chat & Negotation
-* Live two-way messaging between customers and assigned service providers using Firestore real-time listeners.
-* **Dev Demo Board**: Development panel allowing one-click provider simulation replies and status transitions.
+1. **Google Gemma 4 AI Intent Parser**: Analyzes unstructured Roman Urdu/English text (e.g. *"wiring inside the bathroom is sparking urgently"*), extracts category, location, urgency, and produces concise task summaries.
+2. **AI PKR Fair-Price Estimator**: Computes fair service price ranges in Pakistani Rupees (PKR) with contextual explanations.
+3. **Proximity-Based Provider Ranking**: Uses browser geolocation and the Haversine formula to rank specialists and calculate fair travel allowances (`Rs. 100 base + Rs. 20/km`).
+4. **Dual-Profile Marketplace**: 1-click toggle between Customer mode (search & hire) and Provider mode (job feed & PKR earnings).
+5. **InDrive-Style Availability**: Real-time Online/Offline toggle with GPS beacon for technicians.
+6. **Real-Time Chat**: Direct two-way messaging between customers and assigned providers.
 
 ---
 
-## 🛠️ Tech Stack & Architecture
+## 📋 Hackathon Previous Work Declaration
 
-* **AI Engine**: Google Gemma 4 open-weight model (`gemma-4-26b-a4b-it`) under Apache 2.0 license, with resilient local fallback parser.
-* **Frontend**: React 19 (SPA), Vite 8, TypeScript.
-* **Styling & Animation**: Tailwind CSS v4 (`@tailwindcss/vite`), Framer Motion.
-* **Icons**: Lucide React.
-* **Database & Auth (Pre-existing Infrastructure)**: Google Cloud Firestore, Firebase Auth (with automatic local storage fallback).
-* **Testing**: Vitest, React Testing Library, JSDOM.
+| Dimension | Pre-Existing Prototype (Before Event) | Built During Hackathon (New Work) |
+|---|---|---|
+| **AI Integration** | None (Static regex keyword matchers only) | Integrated **Google Gemma 4 (`gemma-4-26b-a4b-it`)** for intent parsing, proximity ranking, and fair PKR price estimation |
+| **Local Fallback Engine** | None | Built resilient offline fallback matrix (`localFallbackParser`) ensuring zero disruption if API limits hit |
+| **Dual-Role Switcher** | None | Built seamless 1-click Role Switcher in Navbar and Profile for instant Customer $\leftrightarrow$ Provider toggling |
+| **Auth & Database** | Pre-existing Firebase Auth and Firestore schema (supporting infrastructure) | Reused as background plumbing so event time focused on AI capabilities |
+| **Architecture & Structure** | Monolithic files, single `SharedUI.tsx`, flat page hierarchy | Modular clean architecture: feature folders (`pages/auth`, `pages/booking`, `pages/provider`, `pages/chat`), decoupled UI primitives |
+| **Quality & CI/CD** | No test runner or automated pipelines | Comprehensive Vitest + Testing Library test suite, JSDOM setup, and automated GitHub Actions CI workflow |
 
 ---
 
-## ⚙️ Environment Variables Setup
-
-Create a `.env` file in the root directory (optional — app runs in zero-config offline mode by default):
-
-```properties
-# Firebase Client Credentials (Optional - uses local mock DB if blank)
-VITE_FIREBASE_API_KEY=your_api_key_here
-VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain_here
-VITE_FIREBASE_PROJECT_ID=your_project_id_here
-VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket_here
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id_here
-VITE_FIREBASE_APP_ID=your_app_id_here
-
-# Open-Weight AI (Google Gemma 4 — Apache 2.0)
-# Model: gemma-4-26b-a4b-it
-VITE_GEMMA_API_KEY=your_google_ai_studio_api_key_here
-VITE_GEMINI_API_KEY=your_google_ai_studio_api_key_here
-VITE_GEMMA_MODEL=gemma-4-26b-a4b-it
-```
+## 📜 Licensing
+* **Application Code**: Licensed under the [MIT License](./LICENSE).
+* **AI Model Weights**: Powered by Google **Gemma 4 (`gemma-4-26b-a4b-it`)**, released under the [Apache 2.0 License](https://ai.google.dev/gemma/terms).
 
 ---
 
 ## 🚀 Running the Project
 
-### 1. Install Dependencies
 ```bash
+# 1. Install dependencies
 npm install
-```
 
-### 2. Run in Development Mode
-```bash
+# 2. Run dev server
 npm run dev
-```
-Access the application at `http://localhost:5173/`.
 
-### 3. Run Automated Tests
-```bash
+# 3. Run automated tests
 npm test
-```
 
-### 4. Build for Production
-```bash
+# 4. Build for production
 npm run build
 ```
-
----
-
-## 📚 Documentation
-Detailed project documents are located in [`docs/`](./docs):
-* [Product Requirements Document (PRD)](./docs/PRD.md)
-* [System Architecture](./docs/ARCHITECTURE.md)
-* [Changelog & History](./docs/CHANGES.md)
