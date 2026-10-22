@@ -68,7 +68,13 @@ khidmat_web_app-main/
 ├── LICENSE                    # MIT License
 ├── package.json               # Dependencies & scripts
 └── vite.config.ts             # Vite bundler config
+```
 
+---
+
+## 🏗️ System Architecture (ARCH)
+
+```mermaid
 graph TD
     User([Customer / Provider]) -->|Role Switcher| Router{React Router v6}
 
@@ -93,7 +99,13 @@ graph TD
         P --> DB
         Beacon --> DB
     end
---
+```
+
+---
+
+## 🚀 Running the Project
+
+```bash
 # 1. Install
 npm install
 
@@ -107,3 +119,4 @@ npm run dev      # http://localhost:5173
 # 4. Test & build
 npm test
 npm run build
+```
