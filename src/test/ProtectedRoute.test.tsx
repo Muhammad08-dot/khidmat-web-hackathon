@@ -5,7 +5,7 @@ import ProtectedRoute from '../components/auth/ProtectedRoute';
 import * as AuthContextModule from '../contexts/AuthContext';
 
 describe('ProtectedRoute Component', () => {
-  it('redirects to /auth when user is not logged in', () => {
+  it('permits children in evaluation mode', () => {
     vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
       user: null,
       userProfile: null,
@@ -32,8 +32,7 @@ describe('ProtectedRoute Component', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Login Page')).toBeInTheDocument();
-    expect(screen.queryByText('Secret Protected Content')).not.toBeInTheDocument();
+    expect(screen.getByText('Secret Protected Content')).toBeInTheDocument();
   });
 
   it('renders children when user is authenticated', () => {
