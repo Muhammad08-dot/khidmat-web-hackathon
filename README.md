@@ -89,16 +89,106 @@ Follow this exact sequence for a seamless presentation that puts AI center-stage
 
 ---
 
-## 🛠️ Tech Stack & Architecture
+## 🏗️ System Architecture
 
-* **AI Engine**: Google Gemma 4 open-weight model (`gemma-4-26b-a4b-it`) under Apache 2.0 license, with resilient local fallback parser.
-* **Frontend**: React 19 (SPA), Vite 8, TypeScript.
-* **Styling & Animation**: Tailwind CSS v4 (`@tailwindcss/vite`), Framer Motion.
-* **Icons**: Lucide React.
-* **Database & Auth (Pre-existing Infrastructure)**: Google Cloud Firestore, Firebase Auth (with automatic local storage fallback).
-* **Testing**: Vitest, React Testing Library, JSDOM.
+Khidmat is designed as a **Serverless, Dual-Role Event-Driven Architecture (EDA)** with an edge-resilient AI parsing pipeline:
+
+```mermaid
+graph TD
+    User([Customer / Service Provider]) -->|Role Switcher| Router{React Router v6}
+    
+    subgraph Client Application [React 19 + TypeScript + Vite 8]
+        Router -->|role = customer| CustomerPortal[Customer Marketplace Portal]
+        Router -->|role = provider| ProviderPortal[Provider Dashboard & Job Feed]
+        
+        CustomerPortal -->|Voice / Text Intent| AIMatcher[AI Matching Engine]
+        CustomerPortal -->|GPS Location| GeoModule[Haversine Proximity Engine]
+        ProviderPortal -->|Live Status| Beacon[Online / Offline Beacon]
+    end
+
+    subgraph Intelligence Layer [Google Gemma 4 AI]
+        AIMatcher -->|REST API v1beta| Gemma4[Google Gemma 4: gemma-4-26b-a4b-it]
+        Gemma4 -.->|Quota Limit / Timeout| Fallback[Local Fallback Matrix <10ms]
+        Gemma4 -->|Structured JSON| IntentResult[Category + Urgency + Fair PKR Price]
+        Fallback -->|Regex Match| IntentResult
+    end
+
+    subgraph Backend Infrastructure [Serverless BaaS]
+        IntentResult --> Firestore[(Google Cloud Firestore)]
+        ProviderPortal --> Firestore
+        Beacon --> Firestore
+        CustomerPortal --> Auth[(Firebase Auth)]
+    end
+```
 
 ---
+
+## 📁 Project Directory Structure
+
+```text
+khidmat_web_app-main/
+├── .github/workflows/          # CI/CD Automated Pipelines (Vitest, Build)
+│   ├── ci.yml
+│   └── auto-merge.yml
+├── docs/                       # Project Documentation & Assets
+│   ├── assets/                 # UI Screenshots for README
+│   ├── ARCHITECTURE.md         # System Architecture deep-dive
+│   ├── PRD.md                  # Product Requirements Document
+│   └── CHANGES.md              # Detailed Changelog & History
+├── scripts/                    # Development & Seed Utilities
+│   ├── refactor.cjs            # Migration script
+│   └── seedData.ts             # 21-category localized Pakistani mock database
+├── src/
+│   ├── components/
+│   │   ├── auth/               # ProtectedRoute & Role Guards
+│   │   ├── features/           # SiteAgentWidget & AI assistants
+│   │   └── ui/                 # Atomic Primitives (Button, Card, Input, Avatar, etc.)
+│   ├── constants/              # App-wide categories & Pakistani cities
+│   ├── contexts/               # AuthContext & Dual-Role Session Management
+│   ├── hooks/                  # Custom hooks (useAuth, useBookings, useProviders, useUserLocation)
+│   ├── layouts/                # Navbar (with Role Switcher), Footer, BottomNav
+│   ├── pages/
+│   │   ├── auth/               # Auth.tsx (Login/Signup with role tabs)
+│   │   ├── booking/            # ConfirmBooking.tsx, MyBookings.tsx
+│   │   ├── chat/               # Chat.tsx, Inbox.tsx
+│   │   ├── provider/           # ProviderHome.tsx (Dashboard), ProviderList.tsx, ProviderProfile.tsx
+│   │   ├── AIMatching.tsx      # Voice scanning radar & Gemma 4 matching
+│   │   ├── Home.tsx            # Dynamic Root (renders CustomerHome vs ProviderHome)
+│   │   ├── Profile.tsx         # User Profile & Dual-Profile Switcher Card
+│   │   ├── Categories.tsx      # 21 Categories Directory
+│   │   └── Safety.tsx          # 5-step safety verification guide
+│   ├── services/
+│   │   ├── firebase.ts         # Firestore, Auth, and fallback LocalStorage DB
+│   │   └── gemini.ts           # Google Gemma 4 REST integration & Local Fallback Parser
+│   ├── test/                   # Vitest unit test suite
+│   ├── types/                  # Global TypeScript contracts
+│   ├── App.tsx                 # Lazy-loaded router configuration
+│   ├── index.css               # Tailwind CSS v4 design tokens & cursor utilities
+│   └── main.tsx                # React DOM entrypoint
+├── LICENSE                     # MIT License
+├── package.json                # Project dependencies & scripts
+├── README.md                   # Project documentation
+└── vite.config.ts              # Vite 8 + Tailwind v4 bundler configuration
+```
+
+---
+
+## 🛠️ Complete Tech Stack
+
+| Layer | Technology | Version | Purpose |
+|---|---|---|---|
+| **AI Intelligence** | **Google Gemma 4** | `gemma-4-26b-a4b-it` | Apache 2.0 open-weight model for Roman Urdu/English intent parsing, ranking, and fair PKR price estimation. |
+| **Fail-Safe Fallback** | **Local Fallback Parser** | Built-in | Client-side rule matrix guaranteeing 100% demo uptime under low connectivity. |
+| **Frontend Core** | **React** | `v19.0.0` | Modern component-based SPA architecture with Concurrent features. |
+| **Language** | **TypeScript** | `v5.8.0` | Strict end-to-end type safety and compile-time verification. |
+| **Build & Tooling** | **Vite** | `v8.1.3` | Next-generation frontend tooling with lightning-fast HMR and bundle optimization. |
+| **Styling** | **Tailwind CSS** | `v4.0.0` | Modern CSS-first utility-driven styling engine with custom design tokens. |
+| **Animations** | **Framer Motion** | `v12.4.7` | Production-grade physics animations, layout transitions, and audio equalizers. |
+| **Routing** | **React Router** | `v6.30.0` | Declarative client-side routing with code-splitting via `React.lazy`. |
+| **Icons** | **Lucide React** | `v1.16.0` | Crisp, scalable SVG icons for all 21 Pakistani service specialties. |
+| **Speech Engine** | **Web Speech API** | Native | In-browser speech-to-text recognition for hands-free Urdu/English queries. |
+| **Database & Auth** | **Firebase BaaS** | `v11.4.0` | Cloud Firestore real-time listeners and Firebase Auth sessions. |
+| **Testing** | **Vitest + RTL + JSDOM** | `v3.0.7` | Modern test runner and component assertions. |
 
 ## ⚙️ Environment Variables Setup
 
