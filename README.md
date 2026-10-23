@@ -41,8 +41,10 @@ Khidmat solves this with a **single dual-role account**, **AI-powered intent mat
 
 ## 🏗️ Architecture
 
+```mermaid
 graph TD
     User([Customer / Provider]) -->|Role Switcher| Router{React Router v6}
+
     subgraph Client [React 19 + TypeScript + Vite]
         Router -->|role = customer| C[Customer Portal]
         Router -->|role = provider| P[Provider Dashboard]
@@ -50,12 +52,14 @@ graph TD
         C -->|GPS Location| Geo[Haversine Proximity]
         P -->|Online Status| Beacon[Beacon Toggle]
     end
-    subgraph Intelligence [Google Gemma 4]
-        AI -->|REST v1beta| G[gemma-4-26b-a4b-it]
+
+    subgraph Intelligence [Google Gemma 4 AI]
+        AI -->|REST API v1beta| G[gemma-4-26b-a4b-it]
         G -.->|Timeout / Quota| F[Local Fallback <10ms]
         G -->|JSON| R[Category + Urgency + PKR]
         F -->|Regex| R
     end
+
     subgraph Backend [Serverless BaaS]
         R --> DB[(Firestore)]
         C --> Auth[(Firebase Auth)]
