@@ -69,26 +69,6 @@ To maintain strict transparency regarding hackathon development guidelines, the 
 
 ---
 
-## 🎬 3-Minute Live Demo Flow for Judges
-Follow this exact sequence for a seamless presentation that puts AI center-stage:
-
-1. **Step 1: The Problem (0:00 - 0:20)**
-   * Introduce Khidmat: Finding reliable, fair-priced local technicians in Pakistan is chaotic and unstructured. Customers struggle with pricing transparency and language barriers (Urdu / Roman Urdu).
-2. **Step 2: Instant Entry (0:20 - 0:40)**
-   * *"We're already logged in as a verified customer. Watch this —"* (Skip login friction entirely to dive straight into the AI experience).
-3. **Step 3: AI Matching & Intent Parsing (0:40 - 2:10)**
-   * Open `/matching` (or use voice/search chip on Home). Type or speak: *"electrician chahiye Gulberg mein"*.
-   * **Gemma 4 in Action**: Watch the model parse the Roman Urdu request live into category (*Electrician*), location (*Gulberg*), and urgency (*High*).
-   * **Proximity Ranking & PKR Pricing**: Transition to `/providers` showing real nearby specialists ranked with estimated PKR price ranges (e.g., `Rs. 700 - 1150`) based on local market rates.
-4. **Step 4: Architecture & Open Weights (2:10 - 2:40)**
-   * Explain how Google Gemma 4 (`gemma-4-26b-a4b-it`) is accessed via the Gemini API endpoints under the Apache 2.0 open-weight license.
-   * Highlight the offline fallback architecture (`localFallbackParser`), guaranteeing the application never fails even in low-connectivity areas.
-5. **Step 5: Booking, Chat & What's Next (2:40 - 3:00)**
-   * Rapidly show one-click booking and live chat synchronization as supporting real-time infrastructure.
-   * Wrap up with future roadmap: Voice-native Urdu audio processing with Gemma audio models and on-device lightweight execution.
-
----
-
 ## 🛠️ Tech Stack & Architecture
 
 * **AI Engine**: Google Gemma 4 open-weight model (`gemma-4-26b-a4b-it`) under Apache 2.0 license, with resilient local fallback parser.
