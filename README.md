@@ -39,9 +39,36 @@ Khidmat solves this with a **single dual-role account**, **AI-powered intent mat
 
 ---
 
-## 🏗️ Architecture
+## 📁 Directory Structure (STR)
 
-```mermaid
+```text
+khidmat_web_app-main/
+├── docs/assets/               # UI Screenshots
+├── scripts/                   # Development Utilities
+├── src/
+│   ├── components/            # UI primitives, auth guards & widgets
+│   ├── contexts/              # AuthContext & Dual-Role Session
+│   ├── hooks/                 # useAuth, useBookings, useProviders, useUserLocation
+│   ├── layouts/               # Navbar (with Role Switcher), Footer, BottomNav
+│   ├── pages/
+│   │   ├── auth/              # Authentication (Customer / Provider)
+│   │   ├── booking/           # ConfirmBooking, MyBookings
+│   │   ├── chat/              # Chat & Inbox
+│   │   ├── provider/          # ProviderHome (Dashboard), ProviderList, ProviderProfile
+│   │   ├── AIMatching.tsx     # Voice radar & Gemma 4 matching
+│   │   ├── Home.tsx           # Dynamic Root (Customer vs Provider)
+│   │   └── Profile.tsx        # User Profile & Switcher Card
+│   ├── services/
+│   │   ├── firebase.ts        # Firestore, Auth, LocalStorage fallback
+│   │   └── gemini.ts          # Gemma 4 REST integration & Fallback Parser
+│   ├── test/                  # Vitest unit tests
+│   ├── types/                 # Global TypeScript contracts
+│   ├── App.tsx                # Lazy-loaded router
+│   └── index.css              # Tailwind CSS v4
+├── LICENSE                    # MIT License
+├── package.json               # Dependencies & scripts
+└── vite.config.ts             # Vite bundler config
+
 graph TD
     User([Customer / Provider]) -->|Role Switcher| Router{React Router v6}
 
@@ -66,3 +93,17 @@ graph TD
         P --> DB
         Beacon --> DB
     end
+--
+# 1. Install
+npm install
+
+# 2. Set up environment
+cp .env.example .env
+# Add VITE_GEMINI_API_KEY=your_key (get one at https://aistudio.google.com/apikey)
+
+# 3. Run
+npm run dev      # http://localhost:5173
+
+# 4. Test & build
+npm test
+npm run build
